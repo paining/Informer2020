@@ -22,6 +22,17 @@ class ConvLayer(nn.Module):
         x = self.maxPool(x)
         x = x.transpose(1,2)
         return x
+    
+class MaxPoolLayer(nn.Module):
+    def __init__(self):
+        super(MaxPoolLayer, self).__init__()
+        self.maxPool = nn.MaxPool1d(kernel_size=3, stride=2, padding=1)
+
+    def forward(self, x):
+        x = x.permute(0, 2, 1)
+        x = self.maxPool(x)
+        x = x.transpose(1,2)
+        return x
 
 class EncoderLayer(nn.Module):
     def __init__(self, attention, d_model, d_ff=None, dropout=0.1, activation="relu"):
@@ -96,3 +107,53 @@ class EncoderStack(nn.Module):
         x_stack = torch.cat(x_stack, -2)
         
         return x_stack, attns
+
+class Encoder_getlayers(nn.Module):
+    def __init__(self, attn_layers, conv_layers=None, norm_layer=None):
+        super(Encoder_getlayers, self).__init__()
+        self.attn_layers = nn.ModuleList(attn_layers)
+        self.conv_layers = nn.ModuleList(conv_layers) if conv_layers is not None and len(conv_layers) != 0 else None
+        self.norm = norm_layer
+
+    def forward(self, x, attn_mask=None):
+        # x [B, L, D]
+        xs = []
+        attns = []
+        if self.conv_layers is not None:
+            for attn_layer, conv_layer in zip(self.attn_layers, self.conv_layers):
+                x, attn = attn_layer(x, attn_mask=attn_mask)
+                x = conv_layer(x)
+                xs.append(x)
+                attns.append(attn)
+            x, attn = self.attn_layers[-1](x, attn_mask=attn_mask)
+            attns.append(attn)
+        else:
+            for attn_layer in self.attn_layers:
+                x, attn = attn_layer(x, attn_mask=attn_mask)
+                xs.append(x)
+                attns.append(attn)
+
+        xs = torch.cat(xs, dim=-2) # Concat by Length?
+        if self.norm is not None:
+            x = self.norm(x)
+            xs = self.norm(xs)
+
+        return x, attns, xs
+
+class EncoderStack_getlayers(nn.Module):
+    def __init__(self, encoders, inp_lens):
+        super(EncoderStack_getlayers, self).__init__()
+        self.encoders = nn.ModuleList(encoders)
+        self.inp_lens = inp_lens
+
+    def forward(self, x, attn_mask=None):
+        # x [B, L, D]
+        x_stack = []; attns = []; xs_stack = []
+        for i_len, encoder in zip(self.inp_lens, self.encoders):
+            inp_len = x.shape[1]//(2**i_len)
+            x_s, attn, xs_s = encoder(x[:, -inp_len:, :])
+            x_stack.append(x_s); attns.append(attn); xs_stack.append(xs_s)
+        x_stack = torch.cat(x_stack, -2)
+        xs_stack = torch.cat(xs_stack, -2) # Concat by Length?
+        
+        return xs_stack, attns

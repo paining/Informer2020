@@ -107,3 +107,14 @@ class DataEmbedding(nn.Module):
         x = self.value_embedding(x) + self.position_embedding(x) + self.temporal_embedding(x_mark)
         
         return self.dropout(x)
+    
+class DataEmbedding_DongUn(nn.Module):
+    def __init__(self, c_in, d_model, dropout=0.1):
+        super(DataEmbedding_DongUn, self).__init__()
+        self.value_embedding = TokenEmbedding(c_in=c_in, d_model=d_model)
+        self.position_embedding = PositionalEmbedding(d_model=d_model)
+        self.dropout = nn.Dropout(p=dropout)
+
+    def forward(self, x):
+        x = self.value_embedding(x) + self.position_embedding(x)
+        return self.dropout(x)

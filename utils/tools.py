@@ -74,3 +74,17 @@ class StandardScaler():
             mean = mean[-1:]
             std = std[-1:]
         return (data * std) + mean
+    
+class MinMaxScaler():
+    def __init__(self):
+        pass
+
+    def fit(self, data):
+        self.min = np.min(data, axis=(0,1), keepdims=True)
+        self.max = np.max(data, axis=(0,1), keepdims=True)
+
+    def transforms(self, data):
+        return (data - self.min) / (self.max-self.min)
+    
+    def inverse_transforms(self, data):
+        return (data * (self.max-self.min)) + self.min
